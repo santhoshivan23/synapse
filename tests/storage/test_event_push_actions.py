@@ -91,6 +91,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                     event.event_id,
                     {user_id: action},
                     False,
+                    None,
                 )
             )
             self.get_success(
