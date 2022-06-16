@@ -91,6 +91,7 @@ RUN \
     openssl \
     rustc \
     zlib1g-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # To speed up rebuilds, install all of the dependencies before we copy over
