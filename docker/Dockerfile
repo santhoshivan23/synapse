@@ -60,14 +60,14 @@ RUN \
 # NB: In poetry 1.2 `poetry export` will be moved into a plugin; we'll need to also
 # pip install poetry-plugin-export (https://github.com/python-poetry/poetry-plugin-export).
 RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --user "poetry-core==1.1.0a7" "git+https://github.com/python-poetry/poetry.git@fb13b3a676f476177f7937ffa480ee5cff9a90a5" ${TEST_ONLY_SKIP_DEP_HASH_VERIFICATION:+--without-hashes}
+  pip install --user "poetry-core==1.1.0a7" "git+https://github.com/python-poetry/poetry.git@fb13b3a676f476177f7937ffa480ee5cff9a90a5"
 
 WORKDIR /synapse
 
 # Copy just what we need to run `poetry export`...
 COPY pyproject.toml poetry.lock /synapse/
 
-RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt
+RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt ${TEST_ONLY_SKIP_DEP_HASH_VERIFICATION:+--without-hashes}
 
 ###
 ### Stage 1: builder
