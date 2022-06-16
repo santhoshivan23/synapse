@@ -28,6 +28,11 @@
 
 ARG PYTHON_VERSION=3.9
 
+# If specified, we won't verify the hashes of dependencies.
+# This is only needed if the hashes of dependencies cannot be checked for some
+# reason, such as when a git repository is used directly as a dependency.
+ARG TEST_ONLY_SKIP_DEP_HASH_VERIFICATION
+
 ###
 ### Stage 0: generate requirements.txt
 ###
@@ -55,7 +60,7 @@ RUN \
 # NB: In poetry 1.2 `poetry export` will be moved into a plugin; we'll need to also
 # pip install poetry-plugin-export (https://github.com/python-poetry/poetry-plugin-export).
 RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --user "poetry-core==1.1.0a7" "git+https://github.com/python-poetry/poetry.git@fb13b3a676f476177f7937ffa480ee5cff9a90a5"
+  pip install --user "poetry-core==1.1.0a7" "git+https://github.com/python-poetry/poetry.git@fb13b3a676f476177f7937ffa480ee5cff9a90a5" ${TEST_ONLY_SKIP_DEP_HASH_VERIFICATION:+--without-hashes}
 
 WORKDIR /synapse
 
