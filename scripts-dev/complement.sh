@@ -51,7 +51,9 @@ fi
 
 # Build the base Synapse image from the local checkout
 echo_if_github "::group::Build Docker image: matrixdotorg/synapse"
-docker build -t matrixdotorg/synapse -f "docker/Dockerfile" .
+docker build -t matrixdotorg/synapse \
+  --build-arg "TEST_ONLY_SKIP_DEP_HASH_VERIFICATION=${TEST_ONLY_SKIP_DEP_HASH_VERIFICATION:-}" \
+  -f "docker/Dockerfile" .
 echo_if_github "::endgroup::"
 
 # Build the workers docker image (from the base Synapse image we just built).
