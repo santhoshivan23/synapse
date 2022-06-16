@@ -28,11 +28,6 @@
 
 ARG PYTHON_VERSION=3.9
 
-# If specified, we won't verify the hashes of dependencies.
-# This is only needed if the hashes of dependencies cannot be checked for some
-# reason, such as when a git repository is used directly as a dependency.
-ARG TEST_ONLY_SKIP_DEP_HASH_VERIFICATION
-
 ###
 ### Stage 0: generate requirements.txt
 ###
@@ -66,6 +61,12 @@ WORKDIR /synapse
 
 # Copy just what we need to run `poetry export`...
 COPY pyproject.toml poetry.lock /synapse/
+
+
+# If specified, we won't verify the hashes of dependencies.
+# This is only needed if the hashes of dependencies cannot be checked for some
+# reason, such as when a git repository is used directly as a dependency.
+ARG TEST_ONLY_SKIP_DEP_HASH_VERIFICATION
 
 RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt ${TEST_ONLY_SKIP_DEP_HASH_VERIFICATION:+--without-hashes}
 
