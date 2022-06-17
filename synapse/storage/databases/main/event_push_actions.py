@@ -1132,10 +1132,12 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
 
         # Other threads should be marked as reset at the old stream ordering.
         txn.execute(
-            "UPDATE event_push_summary SET notif_count = 0, unread_count = 0, stream_ordering = ?"
-            " WHERE user_id = ? AND room_id = ? AND "
-            " stream_ordering < ?",
-            (old_rotate_stream_ordering, user_id, room_id, old_rotate_stream_ordering),
+            """
+            DELETE FROM event_push_summary
+            WHERE user_id = ? AND room_id = ? AND
+            stream_ordering <= ?
+            """,
+            (user_id, room_id, stream_ordering),
         )
 
 
