@@ -1669,6 +1669,24 @@ See <a href="../../reverse_proxy.html">here</a> for more on using a reverse prox
 <pre><code class="language-yaml">max_image_pixels: 35M
 </code></pre>
 <hr />
+<h3 id="prevent_media_downloads_from"><a class="header" href="#prevent_media_downloads_from"><code>prevent_media_downloads_from</code></a></h3>
+<p>A list of domains to never download media from. Media from these
+domains that is already downloaded will not be deleted, but will be
+inaccessible to users. This option does not affect admin APIs trying
+to download/operate on media.</p>
+<p>This will not prevent the listed domains from accessing media themselves.
+It simply prevents users on this server from downloading media originating
+from the listed servers.</p>
+<p>This will have no effect on media originating from the local server.
+This only affects media downloaded from other Matrix servers, to
+block domains from URL previews see <a href="#url_preview_url_blacklist"><code>url_preview_url_blacklist</code></a>.</p>
+<p>Defaults to an empty list (nothing blocked).</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">prevent_media_downloads_from:
+  - evil.example.org
+  - evil2.example.org
+</code></pre>
+<hr />
 <h3 id="dynamic_thumbnails"><a class="header" href="#dynamic_thumbnails"><code>dynamic_thumbnails</code></a></h3>
 <p>Whether to generate new thumbnails on the fly to precisely match
 the resolution requested by the client. If true then whenever
@@ -2248,6 +2266,38 @@ retrospectively to existing sessions for users that have already logged in.</p>
 <p>By default, this is infinite.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">nonrefreshable_access_token_lifetime: 24h
+</code></pre>
+<hr />
+<h3 id="ui_auth"><a class="header" href="#ui_auth"><code>ui_auth</code></a></h3>
+<p>The amount of time to allow a user-interactive authentication session to be active.</p>
+<p>This defaults to 0, meaning the user is queried for their credentials
+before every action, but this can be overridden to allow a single
+validation to be re-used.  This weakens the protections afforded by
+the user-interactive authentication process, by allowing for multiple
+(and potentially different) operations to use the same validation session.</p>
+<p>This is ignored for potentially &quot;dangerous&quot; operations (including
+deactivating an account, modifying an account password, adding a 3PID,
+and minting additional login tokens).</p>
+<p>Use the <code>session_timeout</code> sub-option here to change the time allowed for credential validation.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">ui_auth:
+    session_timeout: &quot;15s&quot;
+</code></pre>
+<hr />
+<h3 id="login_via_existing_session"><a class="header" href="#login_via_existing_session"><code>login_via_existing_session</code></a></h3>
+<p>Matrix supports the ability of an existing session to mint a login token for
+another client.</p>
+<p>Synapse disables this by default as it has security ramifications -- a malicious
+client could use the mechanism to spawn more than one session.</p>
+<p>The duration of time the generated token is valid for can be configured with the
+<code>token_timeout</code> sub-option.</p>
+<p>User-interactive authentication is required when this is enabled unless the
+<code>require_ui_auth</code> sub-option is set to <code>False</code>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">login_via_existing_session:
+    enabled: true
+    require_ui_auth: false
+    token_timeout: &quot;5m&quot;
 </code></pre>
 <hr />
 <h2 id="metrics"><a class="header" href="#metrics">Metrics</a></h2>
@@ -3055,22 +3105,6 @@ Defaults to false.</li>
       require_uppercase: true
 </code></pre>
 <hr />
-<h3 id="ui_auth"><a class="header" href="#ui_auth"><code>ui_auth</code></a></h3>
-<p>The amount of time to allow a user-interactive authentication session to be active.</p>
-<p>This defaults to 0, meaning the user is queried for their credentials
-before every action, but this can be overridden to allow a single
-validation to be re-used.  This weakens the protections afforded by
-the user-interactive authentication process, by allowing for multiple
-(and potentially different) operations to use the same validation session.</p>
-<p>This is ignored for potentially &quot;dangerous&quot; operations (including
-deactivating an account, modifying an account password, and
-adding a 3PID).</p>
-<p>Use the <code>session_timeout</code> sub-option here to change the time allowed for credential validation.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">ui_auth:
-    session_timeout: &quot;15s&quot;
-</code></pre>
-<hr />
 <h2 id="push"><a class="header" href="#push">Push</a></h2>
 <p>Configuration settings related to push notifications</p>
 <hr />
@@ -3459,13 +3493,17 @@ events may be dropped).</p>
 <hr />
 <h3 id="instance_map"><a class="header" href="#instance_map"><code>instance_map</code></a></h3>
 <p>When using workers this should be a map from <a href="#worker_name"><code>worker_name</code></a> to the
-HTTP replication listener of the worker, if configured.
+HTTP replication listener of the worker, if configured, and to the main process.
 Each worker declared under <a href="../../workers.html#stream-writers"><code>stream_writers</code></a> needs
 a HTTP replication listener, and that listener should be included in the <code>instance_map</code>.
-(The main process also needs an HTTP replication listener, but it should not be
-listed in the <code>instance_map</code>.)</p>
+The main process also needs an entry on the <code>instance_map</code>, and it should be listed under
+<code>main</code> <strong>if even one other worker exists</strong>. Ensure the port matches with what is declared 
+inside the <code>listener</code> block for a <code>replication</code> listener.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">instance_map:
+  main:
+    host: localhost
+    port: 8030
   worker1:
     host: localhost
     port: 8034
@@ -3530,11 +3568,32 @@ This setting has the following sub-options:</p>
 localhost and 6379</p>
 </li>
 <li>
+<p><code>path</code>: The full path to a local Unix socket file. <strong>If this is used, <code>host</code> and
+<code>port</code> are ignored.</strong> Defaults to `/tmp/redis.sock'</p>
+</li>
+<li>
 <p><code>password</code>: Optional password if configured on the Redis instance.</p>
 </li>
 <li>
 <p><code>dbid</code>: Optional redis dbid if needs to connect to specific redis logical db.</p>
+</li>
+<li>
+<p><code>use_tls</code>: Whether to use tls connection. Defaults to false.</p>
+</li>
+<li>
+<p><code>certificate_file</code>: Optional path to the certificate file</p>
+</li>
+<li>
+<p><code>private_key_file</code>: Optional path to the private key file</p>
+</li>
+<li>
+<p><code>ca_file</code>: Optional path to the CA certificate file. Use this one or:</p>
+</li>
+<li>
+<p><code>ca_path</code>: Optional path to the folder containing the CA certificate file</p>
 <p><em>Added in Synapse 1.78.0.</em></p>
+<p><em>Changed in Synapse 1.84.0: Added use_tls, certificate_file, private_key_file, ca_file and ca_path attributes</em></p>
+<p><em>Changed in Synapse 1.85.0: Added path option to use a local Unix socket</em></p>
 </li>
 </ul>
 <p>Example configuration:</p>
@@ -3544,6 +3603,10 @@ localhost and 6379</p>
   port: 6379
   password: &lt;secret_password&gt;
   dbid: &lt;dbid&gt;
+  #use_tls: True
+  #certificate_file: &lt;path_to_the_certificate_file&gt;
+  #private_key_file: &lt;path_to_the_private_key_file&gt;
+  #ca_file: &lt;path_to_the_ca_certificate_file&gt;
 </code></pre>
 <hr />
 <h2 id="individual-worker-configuration"><a class="header" href="#individual-worker-configuration">Individual worker configuration</a></h2>
@@ -3571,6 +3634,7 @@ giving each worker a unique <code>worker_name</code>.</p>
 </code></pre>
 <hr />
 <h3 id="worker_replication_host"><a class="header" href="#worker_replication_host"><code>worker_replication_host</code></a></h3>
+<p><em>Deprecated as of version 1.84.0. Place <code>host</code> under <code>main</code> entry on the <a href="#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
 <p>The HTTP replication endpoint that it should talk to on the main Synapse process.
 The main Synapse process defines this with a <code>replication</code> resource in
 <a href="#listeners"><code>listeners</code> option</a>.</p>
@@ -3579,6 +3643,7 @@ The main Synapse process defines this with a <code>replication</code> resource i
 </code></pre>
 <hr />
 <h3 id="worker_replication_http_port"><a class="header" href="#worker_replication_http_port"><code>worker_replication_http_port</code></a></h3>
+<p><em>Deprecated as of version 1.84.0. Place <code>port</code> under <code>main</code> entry on the <a href="#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
 <p>The HTTP replication port that it should talk to on the main Synapse process.
 The main Synapse process defines this with a <code>replication</code> resource in
 <a href="#listeners"><code>listeners</code> option</a>.</p>
@@ -3587,6 +3652,7 @@ The main Synapse process defines this with a <code>replication</code> resource i
 </code></pre>
 <hr />
 <h3 id="worker_replication_http_tls"><a class="header" href="#worker_replication_http_tls"><code>worker_replication_http_tls</code></a></h3>
+<p><em>Deprecated as of version 1.84.0. Place <code>tls</code> under <code>main</code> entry on the <a href="#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
 <p>Whether TLS should be used for talking to the HTTP replication port on the main
 Synapse process.
 The main Synapse process defines this with the <code>tls</code> option on its <a href="#listeners">listener</a> that
@@ -3604,9 +3670,9 @@ See <a href="#worker_replication_secret"><code>worker_replication_secret</code><
 <p>A worker can handle HTTP requests. To do so, a <code>worker_listeners</code> option
 must be declared, in the same way as the <a href="#listeners"><code>listeners</code> option</a>
 in the shared config.</p>
-<p>Workers declared in <a href="#stream_writers"><code>stream_writers</code></a> will need to include a
-<code>replication</code> listener here, in order to accept internal HTTP requests from
-other workers.</p>
+<p>Workers declared in <a href="#stream_writers"><code>stream_writers</code></a> and <a href="#instance_map"><code>instance_map</code></a>
+will need to include a <code>replication</code> listener here, in order to accept internal HTTP 
+requests from other workers.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">worker_listeners:
   - type: http
